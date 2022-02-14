@@ -254,11 +254,15 @@ func fieldLocation(fieldStack []*protogen.Field) string {
 func fieldValue(parentStructVar string, field *protogen.Field) []interface{} {
 	valueExpr := []interface{}{parentStructVar, ".Get", field.GoName, "()"}
 	switch field.Desc.Kind() {
-	case protoreflect.StringKind:
-		// No special casing required.
 	case protoreflect.BytesKind:
 		valueExpr = append([]interface{}{"string("}, valueExpr...)
 		valueExpr = append(valueExpr, ")")
+	case protoreflect.StringKind:
+		if field.Desc.Cardinality() != protoreflect.Repeated {
+			// No special casing required for a non-repeated string.
+			break
+		}
+		fallthrough
 	default:
 		valueExpr = append([]interface{}{fmtPkg.Ident("Sprintf"), `("%v", `}, valueExpr...)
 		valueExpr = append(valueExpr, ")")
