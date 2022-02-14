@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package example;
 
-import "github.com/improbable-io/go-proto-logfields/logfields.proto";
+option go_package = "github.com/nvx/go-proto-logfields/example";
+
+import "logfields.proto";
 
 message Note {
   string author = 1 [(improbable.logfield) = {name: "author"}];

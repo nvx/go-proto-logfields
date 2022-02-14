@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package logfields_test;
 
-option go_package = "logfieldstest";
+option go_package = "github.com/nvx/go-proto-logfields/logfieldstest";
 
-import "github.com/improbable-io/go-proto-logfields/logfields.proto";
+import "logfields.proto";
 
 message UnloggedTest3 {
   int32 single_integer = 1;
@@ -26,7 +26,7 @@ message EmbeddedTest3 {
   string single_string = 1 [ (improbable.logfield) = {name : "a_string"} ];
   string outer_text = 2 [ (improbable.logfield) = {name : "log_text"} ];
 
-  Inner single_message = 3 [ (improbable.logfield) = {prefix : "inner"} ];
+  Inner single_message = 3 [ (improbable.logfield) = {} ];
   repeated Inner repeated_messages = 4;
 }
 

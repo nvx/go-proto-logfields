@@ -1,4 +1,4 @@
-module github.com/improbable-io/go-proto-logfields
+module github.com/nvx/go-proto-logfields
 
 go 1.13
 

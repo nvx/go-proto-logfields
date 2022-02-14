@@ -5,7 +5,7 @@ package main
 import (
 	"google.golang.org/protobuf/compiler/protogen"
 
-	"github.com/improbable-io/go-proto-logfields/internal/genlogfields"
+	"github.com/nvx/go-proto-logfields/internal/genlogfields"
 )
 
 func main() {

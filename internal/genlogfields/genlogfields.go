@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	logfields "github.com/improbable-io/go-proto-logfields"
+	logfields "github.com/nvx/go-proto-logfields"
 )
 
 func GenerateFile(gen *protogen.Plugin, file *protogen.File) *protogen.GeneratedFile {
@@ -30,118 +30,14 @@ func GenerateFile(gen *protogen.Plugin, file *protogen.File) *protogen.Generated
 var (
 	fmtPkg       = protogen.GoImportPath("fmt")
 	stringsPkg   = protogen.GoImportPath("strings")
-	logfieldsPkg = protogen.GoImportPath("github.com/improbable-io/go-proto-logfields")
+	logfieldsPkg = protogen.GoImportPath("github.com/nvx/go-proto-logfields")
 )
 
 func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile) {
-	if !validateFileLogNames(gen, file) {
-		return
-	}
-
 	for _, msg := range file.Messages {
 		generateLogHandlers(g, msg)
 		generateExtractRequestFields(g, msg)
 	}
-}
-
-func validateFileLogNames(gen *protogen.Plugin, file *protogen.File) bool {
-	isValid := true
-	for _, msg := range file.Messages {
-		isValid = isValid && validateMessageLogNames(gen, msg, nil, map[string]string{})
-	}
-	return isValid
-}
-
-func validateMessageLogNames(gen *protogen.Plugin, msg *protogen.Message, fieldStack []*protogen.Field, knownFieldNames map[string]string) bool {
-	isValid := true
-
-	for _, oneOf := range msg.Oneofs {
-		oneOfFieldNames := map[string]string{}
-		for _, field := range oneOf.Fields {
-			fieldName, fieldLocation, ok := getFieldLogName(gen, field, fieldStack)
-			if fieldName == "" {
-				isValid = isValid && ok
-				continue
-			}
-
-			if prevLocation, ok := knownFieldNames[fieldName]; ok {
-				gen.Error(fmt.Errorf("log field name %q used at %q is already defined at %q", fieldName, prevLocation, fieldLocation))
-				isValid = false
-			} else {
-				oneOfFieldNames[fieldName] = fieldLocation
-			}
-		}
-
-		for k, v := range oneOfFieldNames {
-			knownFieldNames[k] = v
-		}
-	}
-
-	for _, field := range msg.Fields {
-		if field.Oneof != nil {
-			continue
-		}
-
-		if field.Message == nil || field.Desc.Cardinality() == protoreflect.Repeated {
-			fieldName, fieldLocation, ok := getFieldLogName(gen, field, fieldStack)
-			if fieldName == "" {
-				isValid = isValid && ok
-			} else if prevLocation, ok := knownFieldNames[fieldName]; ok {
-				gen.Error(fmt.Errorf("log field name %q used at %q is already defined at %q", fieldName, prevLocation, fieldLocation))
-				isValid = false
-			} else {
-				knownFieldNames[fieldName] = fieldLocation
-			}
-			continue
-		}
-
-		log, ok := retrieveLogAnnotation(field.Desc.Options())
-		if !ok {
-			gen.Error(extractionError(field.Desc.FullName()))
-			isValid = false
-			continue
-		}
-
-		if log.GetName() != "" {
-			gen.Error(fmt.Errorf("cannot assign log name to message field %q, use a 'prefix' annotation if required", field.Desc.FullName()))
-			isValid = false
-			continue
-		} else if log != nil && log.GetPrefix() == "" {
-			gen.Error(fmt.Errorf("message field %q has an empty log prefix", field.Desc.FullName()))
-			isValid = false
-			continue
-		}
-
-		isValid = isValid && validateMessageLogNames(gen, field.Message, append(fieldStack, field), knownFieldNames)
-	}
-	return isValid
-}
-
-func getFieldLogName(gen *protogen.Plugin, field *protogen.Field, fieldStack []*protogen.Field) (string, string, bool) {
-	log, ok := retrieveLogAnnotation(field.Desc.Options())
-	if !ok {
-		gen.Error(extractionError(field.Desc.FullName()))
-		return "", "", false
-	} else if log == nil {
-		return "", "", true
-	}
-
-	if field.Desc.Cardinality() == protoreflect.Repeated {
-		gen.Error(fmt.Errorf("cannot log repeated field %q", field.Desc.FullName()))
-		return "", "", false
-	}
-
-	if log.GetName() == "" {
-		gen.Error(fmt.Errorf("literal field %q has an empty log name", field.Desc.FullName()))
-		return "", "", false
-	} else if log.GetPrefix() != "" {
-		gen.Error(fmt.Errorf(
-			"literal field %q cannot have a log 'prefix' annotation, these are for nested message fields and one-ofs", field.Desc.FullName(),
-		))
-		return "", "", false
-	}
-
-	return fieldPrefix(fieldStack) + log.GetName(), fieldLocation(append(fieldStack, field)), true
 }
 
 func generateLogHandlers(g *protogen.GeneratedFile, msg *protogen.Message) {
@@ -200,7 +96,6 @@ func generateLogHandlerComplex(g *protogen.GeneratedFile, msg *protogen.Message)
 
 	type mergeMap struct {
 		mapVar string
-		prefix string
 	}
 	var mapsToMerge []mergeMap
 
@@ -209,10 +104,8 @@ func generateLogHandlerComplex(g *protogen.GeneratedFile, msg *protogen.Message)
 		g.P("hasInner = hasInner || len(", oneOfMapVar, ") > 0")
 		g.P()
 
-		log, _ := retrieveLogAnnotation(oneOf.Desc.Options())
 		mapsToMerge = append(mapsToMerge, mergeMap{
 			mapVar: oneOfMapVar,
-			prefix: log.GetPrefix(),
 		})
 	}
 
@@ -227,10 +120,8 @@ func generateLogHandlerComplex(g *protogen.GeneratedFile, msg *protogen.Message)
 		g.P("hasInner = hasInner || len(", childMsgMapVar, ") > 0")
 		g.P()
 
-		log, _ := retrieveLogAnnotation(field.Desc.Options())
 		mapsToMerge = append(mapsToMerge, mergeMap{
 			mapVar: childMsgMapVar,
-			prefix: log.GetPrefix(),
 		})
 	}
 
@@ -244,11 +135,7 @@ func generateLogHandlerComplex(g *protogen.GeneratedFile, msg *protogen.Message)
 
 	for _, mapToMerge := range mapsToMerge {
 		g.P("for k, v := range ", mapToMerge.mapVar, " {")
-		if mapToMerge.prefix != "" {
-			g.P(literalsMapVar, `["`, mapToMerge.prefix, `."+k] = v`)
-		} else {
-			g.P(literalsMapVar, "[k] = v")
-		}
+		g.P(literalsMapVar, "[k] = v")
 		g.P("}")
 		g.P()
 	}
@@ -291,14 +178,7 @@ func generateLogHandlerOneOfMap(g *protogen.GeneratedFile, oneOf *protogen.Oneof
 		g.P("case *", field.GoIdent, ":")
 		if field.Message != nil {
 			fieldRef := fmt.Sprintf("m.%s.(*%s).%s", oneOf.GoName, field.GoIdent.GoName, field.GoName)
-			if log.GetPrefix() != "" {
-				g.P(oneOfMapVar, " = map[string]string{}")
-				g.P("for k, v := range ", logfieldsPkg.Ident("ExtractLogFieldsFromMessage"), "(", fieldRef, ") {")
-				g.P(oneOfMapVar, `["`, log.GetPrefix(), `."+k] = v`)
-				g.P("}")
-			} else {
-				g.P(oneOfMapVar, " = ", logfieldsPkg.Ident("ExtractLogFieldsFromMessage"), "(", fieldRef, ")")
-			}
+			g.P(oneOfMapVar, " = ", logfieldsPkg.Ident("ExtractLogFieldsFromMessage"), "(", fieldRef, ")")
 		} else {
 			// NB: See the comment on the 'fieldValue' on why this is so elaborate.
 			g.P(append(append([]interface{}{oneOfMapVar, ` = map[string]string{"`, log.GetName(), `": `}, fieldValue("m", field)...), "}")...)
@@ -318,7 +198,7 @@ func generateExtractRequestFields(g *protogen.GeneratedFile, msg *protogen.Messa
 		}
 	}
 
-	g.P("func (m *", msg.GoIdent, ") ExtractRequestFields(prefixes []string, dst map[string]interface{}) {")
+	g.P("func (m *", msg.GoIdent, ") ExtractRequestFields(dst map[string]interface{}) {")
 	defer func() {
 		g.P("}")
 		g.P()
@@ -345,13 +225,9 @@ func generateExtractRequestFields(g *protogen.GeneratedFile, msg *protogen.Messa
 		}
 
 		if field.Message != nil {
-			prefixesVar := "prefixes"
-			if log.GetPrefix() != "" {
-				prefixesVar = fmt.Sprintf(`append(prefixes, "%s")`, log.GetPrefix())
-			}
-			g.P(logfieldsPkg.Ident("ExtractRequestFieldsFromMessage"), "(m.Get", field.GoName, "(), ", prefixesVar, ", dst)")
+			g.P(logfieldsPkg.Ident("ExtractRequestFieldsFromMessage"), "(m.Get", field.GoName, "(), dst)")
 		} else if log != nil {
-			g.P("dst[", stringsPkg.Ident("Join"), `(append(prefixes, "`, log.GetName(), `"), ".")] = m.Get`, field.GoName, "()")
+			g.P(`dst["`, log.GetName(), `"] = m.Get`, field.GoName, "()")
 		}
 
 		if field.Oneof != nil {
@@ -370,16 +246,6 @@ func fieldLocation(fieldStack []*protogen.Field) string {
 		}
 	}
 	return strings.TrimSuffix(location, ".")
-}
-
-func fieldPrefix(fieldStack []*protogen.Field) string {
-	var prefix string
-	for _, field := range fieldStack {
-		if log, _ := retrieveLogAnnotation(field.Desc.Options()); log != nil {
-			prefix += log.GetPrefix() + "."
-		}
-	}
-	return prefix
 }
 
 // fieldValue produces a slice that should be fed directly into the generated file's printer method

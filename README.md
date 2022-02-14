@@ -8,10 +8,9 @@ It is useful to augment log messages with additional context from the execution 
 
 ## Install
 
-* Install `protoc`, and ensure it is on your path.
 * Install Go.
-* `go install github.com/gogo/protobuf/protoc-gen-gogo`
-* `go install github.com/improbable-io/go-proto-logfields/protoc-gen-gologfields`
+* Install `protoc` and `protoc-gen-go`, and ensure they are in your path.
+* `go install github.com/nvx/go-proto-logfields/protoc-gen-gologfields`
 
 ## Usage
 
@@ -19,7 +18,7 @@ Given a an RPC:
 ```
 syntax = "proto3";
 package doer_of_something;
-import "github.com/improbable-io/go-proto-logfields/logfields.proto";
+import "logfields.proto";
 
 Service Doer {
   rpc DoSomething (SomethingRequest) returns (SomethingResponse) {}
@@ -33,38 +32,5 @@ message SomethingRequest {
 }
 ```
 
-The logfields extractor can be generated with:
-```
-protoc \
-  --proto_path=${GOPATH//:/\/src --proto_path=}/src \
-  --proto_path=${GOPATH//:/\/src --proto_path=}/src/github.com/gogo/protobuf/src \
-  --proto_path=. \
-  --gogo_out=. \
-  --gologfields_out=. \
-  *.proto
-```
-
-With the generated code, a set of logging fields can be generated as follows:
-```
-fields := (&SomethingRequest{What: "something"}).LogFields()
-fmt.Println(fields)
-// prints: map[what_was_requested: something]
-```
-
-## Using golang/protobuf instead of gogo/protobuf
-
-By default, the output files use the `github.com/gogo/protobuf` implementation. To use the `github.com/golang/protobuf` implementation, the logfields generator must be passed a `gogoimport=false` flag as follows:
-```
-protoc \
-  --proto_path=${GOPATH//:/\/src --proto_path=}/src \
-  --proto_path=${GOPATH//:/\/src --proto_path=}/src/github.com/google/protobuf/src \
-  --proto_path=. \
-  --go_out=. \
-  --gologfields_out=gogoimport=false:. \
-  *.proto
-```
-
-The changes are:
-* The `--proto_path` is adjusted from the gogo repository to the google repository.
-* `--gogo_out` is replaced with `--go_out`.
-* `--gologfields_out=.` is replaced with `--gologfields_out=gogoimport=false:.`.
+The logfields extractor can be generated with buf.build using `buf generate.
+See the `buf.yaml` and `buf.gen.yaml` files in this repository for an example.

@@ -4,7 +4,7 @@ syntax = "proto3";
 
 package improbable;
 
-option go_package = "github.com/improbable-io/go-proto-logfields;logfields";
+option go_package = "github.com/nvx/go-proto-logfields;logfields";
 
 import "google/protobuf/descriptor.proto";
 
@@ -20,25 +20,4 @@ message LogField {
   // Name of the log context field where the value of this field should be
   // recorded. Fields with empty names are ignored.
   string name = 1;
-
-  // Prefix for nested fields in a nested message or group. The full log name
-  // that will be used for a field is consituted by prepending all prefixes from
-  // parent messages until reaching the top-level message. Parent messages
-  // without a specified prefix are skipped.
-  //
-  // Example:
-  // message Top {
-  //   message Inner {
-  //     string field = 1 [(improbable.logfields) = {name: "text"}];
-  //   }
-  //
-  //   message Nested {
-  //     Inner inner = 1 [(improbable.logfields) = {prefix: "inner"}];
-  //   }
-  //
-  //   Nested nested = 1;
-  // }
-  //
-  // will see the value of the "field" string logged under key "inner.text".
-  string prefix = 2;
 }

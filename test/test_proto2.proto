@@ -2,9 +2,9 @@ syntax = "proto2";
 
 package logfields_test;
 
-option go_package = "logfieldstest";
+option go_package = "github.com/nvx/go-proto-logfields/logfieldstest";
 
-import "github.com/improbable-io/go-proto-logfields/logfields.proto";
+import "logfields.proto";
 
 message TestMessage2 {
   message Inner {
@@ -25,8 +25,8 @@ message TestMessage2 {
       [ (improbable.logfield) = {name : "opt_bytes"} ];
 
   required Inner required_message = 10
-      [ (improbable.logfield) = {prefix : "required"} ];
+      [ (improbable.logfield) = {} ];
   optional Inner optional_message = 11
-      [ (improbable.logfield) = {prefix : "optional"} ];
+      [ (improbable.logfield) = {} ];
   repeated Inner repeated_messages = 12;
 }
