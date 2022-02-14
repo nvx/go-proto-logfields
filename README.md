@@ -10,7 +10,7 @@ It is useful to augment log messages with additional context from the execution 
 
 * Install Go.
 * Install `protoc` and `protoc-gen-go`, and ensure they are in your path.
-* `go install github.com/nvx/go-proto-logfields/protoc-gen-gologfields`
+* `go install github.com/nvx/go-proto-logfields/protoc-gen-gologfields@latest`
 
 ## Usage
 
