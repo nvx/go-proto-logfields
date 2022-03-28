@@ -212,10 +212,6 @@ func generateExtractRequestFields(g *protogen.GeneratedFile, msg *protogen.Messa
 	g.P("}")
 
 	for _, field := range msg.Fields {
-		if field.Desc.Cardinality() == protoreflect.Repeated {
-			continue
-		}
-
 		log := retrieveLogAnnotation(field.Desc.Options())
 		if field.Message == nil && log == nil {
 			continue
@@ -227,9 +223,12 @@ func generateExtractRequestFields(g *protogen.GeneratedFile, msg *protogen.Messa
 		}
 
 		if field.Message != nil {
-			g.P(logfieldsPkg.Ident("ExtractRequestFieldsFromMessage"), "(m.Get", field.GoName, "(), dst)")
+			// TODO: What's a good way to handle repeated sub-messages?
+			if field.Desc.Cardinality() != protoreflect.Repeated {
+				g.P(logfieldsPkg.Ident("ExtractRequestFieldsFromMessage"), "(m.Get", field.GoName, "(), dst)")
+			}
 		} else if log != nil {
-			g.P(`dst["`, log.GetName(), `"] = m.Get`, field.GoName, "()")
+			g.P(append([]interface{}{`dst["`, log.GetName(), `"] = `}, fieldValue("m", field)...)...)
 		}
 
 		if field.Oneof != nil {
