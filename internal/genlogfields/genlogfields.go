@@ -102,6 +102,10 @@ func generateLogHandlerComplex(g *protogen.GeneratedFile, msg *protogen.Message)
 	mapsToMerge := make([]mergeMap, 0, len(msg.Oneofs)+len(msg.Fields))
 
 	for _, oneOf := range msg.Oneofs {
+		if oneOf.Desc.IsSynthetic() {
+			continue
+		}
+
 		oneOfMapVar := generateLogHandlerOneOfMap(g, oneOf)
 		g.P("hasInner = hasInner || len(", oneOfMapVar, ") > 0")
 		g.P()
@@ -149,7 +153,7 @@ func generateLogHandlerLiteralsMap(g *protogen.GeneratedFile, msg *protogen.Mess
 
 	g.P(literalsMapVar, " := map[string]string{")
 	for _, field := range msg.Fields {
-		if field.Message != nil || field.Oneof != nil {
+		if field.Message != nil || (field.Oneof != nil && !field.Oneof.Desc.IsSynthetic()) {
 			continue
 		}
 
@@ -218,7 +222,7 @@ func generateExtractRequestFields(g *protogen.GeneratedFile, msg *protogen.Messa
 		}
 
 		g.P()
-		if field.Oneof != nil {
+		if field.Oneof != nil && !field.Oneof.Desc.IsSynthetic() {
 			g.P("if _, ok := m.", field.Oneof.GoName, ".(*", field.GoIdent, "); ok {")
 		}
 
@@ -231,7 +235,7 @@ func generateExtractRequestFields(g *protogen.GeneratedFile, msg *protogen.Messa
 			g.P(append([]interface{}{`dst["`, log.GetName(), `"] = `}, fieldValue("m", field)...)...)
 		}
 
-		if field.Oneof != nil {
+		if field.Oneof != nil && !field.Oneof.Desc.IsSynthetic() {
 			g.P("}")
 		}
 	}
